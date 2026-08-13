@@ -29,6 +29,19 @@ export type Kpi = {
 export type ZoneCount = { name: string; workers: number; level: Status };
 export type HealthMetric = { label: string; value: number; level: Status };
 
+/** An AI-generated report, straight from the `reports` table — no fabricated
+ * confidence score or page count, since the schema doesn't track either. */
+export type SiteReport = {
+  id: string;
+  title: string;
+  projectId: string | null;
+  project: string;
+  generated: string;
+  summary: string;
+  body: string;
+  aiProvider: string | null;
+};
+
 /** A project with the rollups the cards show, all counted from real rows. */
 export type ProjectSummary = {
   id: string;
@@ -37,6 +50,7 @@ export type ProjectSummary = {
   client: string;
   location: string;
   phase: string;
+  budget: string;
   status: string;
   statusLevel: Status;
   progress: number;
@@ -45,6 +59,44 @@ export type ProjectSummary = {
   blueprint: string;
   ai: string;
   lastActivity: string;
+};
+
+/** A task row from `tasks`. No completion percentage exists in the schema, so
+ * status is the only progress signal shown — a number here would be invented. */
+export type SiteTask = {
+  id: string;
+  ref: string;
+  title: string;
+  projectId: string;
+  project: string;
+  assignee: string;
+  location: string;
+  due: string;
+  priority: string;
+  priorityLevel: Status;
+  status: string;
+  statusLevel: Status;
+};
+
+/** A blueprint row from `blueprints`. `aiRiskSummary` is the one AI field the
+ * schema actually has — there's no per-sheet component count or file size. */
+export type SiteBlueprint = {
+  id: string;
+  projectId: string;
+  name: string;
+  code: string;
+  project: string;
+  level: string | null;
+  discipline: string;
+  revision: string;
+  status: string;
+  approval: string;
+  approvalLevel: Status;
+  uploader: string;
+  uploaded: string;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  aiRiskSummary: string | null;
 };
 
 export type LiveSnapshot = {
@@ -57,7 +109,12 @@ export type LiveSnapshot = {
   activity: ActivityEvent[];
   workers: Worker[];
   projects: ProjectSummary[];
+  tasks: SiteTask[];
+  blueprintsTotal: number;
+  blueprintsPending: number;
+  blueprints: SiteBlueprint[];
   issues: Issue[];
+  reports: SiteReport[];
   aiHealth: HealthMetric[];
   zones: ZoneCount[];
   transcript: TranscriptLine[];
@@ -81,7 +138,12 @@ const EMPTY: LiveSnapshot = {
   activity: [],
   workers: [],
   projects: [],
+  tasks: [],
+  blueprintsTotal: 0,
+  blueprintsPending: 0,
+  blueprints: [],
   issues: [],
+  reports: [],
   aiHealth: [],
   zones: [],
   transcript: [],
@@ -147,7 +209,7 @@ async function load(): Promise<void> {
 
   inflight = (async () => {
     try {
-      const [profiles, statuses, devices, events, zones, levels, media, tasks, projects, blueprints] =
+      const [profiles, statuses, devices, events, zones, levels, media, tasks, projects, blueprints, reportRows] =
         await Promise.all([
           supabase.from("profiles").select("id, display_name, email, site_role"),
           supabase.from("worker_status").select("*"),
@@ -160,9 +222,14 @@ async function load(): Promise<void> {
           supabase.from("zones").select("id, name, project_id, level_id"),
           supabase.from("levels").select("id, name, project_id"),
           supabase.from("media_assets").select("id, ai_status, ai_analysis"),
-          supabase.from("tasks").select("id, status"),
+          supabase.from("tasks").select("*"),
           supabase.from("projects").select("*").order("created_at", { ascending: true }),
-          supabase.from("blueprints").select("id, project_id, approval_status"),
+          supabase.from("blueprints").select("*"),
+          supabase
+            .from("reports")
+            .select("id, project_id, title, summary, body, ai_provider, created_at")
+            .order("created_at", { ascending: false })
+            .limit(50),
         ]);
 
       const firstError =
@@ -175,7 +242,8 @@ async function load(): Promise<void> {
         media.error ??
         tasks.error ??
         projects.error ??
-        blueprints.error;
+        blueprints.error ??
+        reportRows.error;
       if (firstError) throw new Error(firstError.message);
 
       const statusByUser = new Map((statuses.data ?? []).map((s) => [s.user_id, s]));
@@ -311,7 +379,105 @@ async function load(): Promise<void> {
         } satisfies Issue;
       });
 
-      const doneTasks = (tasks.data ?? []).filter((t) => t.status === "done").length;
+      const reports: SiteReport[] = (reportRows.data ?? []).map((r) => ({
+        id: r.id,
+        title: r.title,
+        projectId: r.project_id,
+        project: projectById.get(r.project_id ?? "")?.name ?? "Unassigned",
+        generated: new Date(r.created_at).toLocaleString([], {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        summary: r.summary,
+        body: r.body,
+        aiProvider: r.ai_provider,
+      }));
+
+      /* Task register, straight off `tasks`. The app writes "todo" /
+         "in_progress" / "blocked" / "completed" — nothing else. */
+      const taskStatusLabel = (status: string) =>
+        status === "in_progress"
+          ? "In progress"
+          : status === "completed"
+            ? "Complete"
+            : status === "blocked"
+              ? "Blocked"
+              : "To do";
+      const taskStatusLevel = (status: string): Status =>
+        status === "blocked"
+          ? "critical"
+          : status === "completed"
+            ? "success"
+            : status === "in_progress"
+              ? "warning"
+              : "idle";
+      const taskPriorityLevel = (priority: string | null): Status => {
+        const p = (priority ?? "").toLowerCase();
+        if (p === "critical") return "critical";
+        if (p === "high") return "warning";
+        return "idle";
+      };
+
+      const siteTasks: SiteTask[] = (tasks.data ?? []).map((t) => {
+        const zone = zoneById.get(t.zone_id ?? "");
+        const level = levelById.get(t.level_id ?? "");
+        return {
+          id: t.id,
+          ref: `#${t.id.slice(-6).toUpperCase()}`,
+          title: t.title,
+          projectId: t.project_id,
+          project: projectById.get(t.project_id)?.name ?? "Unassigned",
+          assignee: t.assigned_to ? (nameByUser.get(t.assigned_to) ?? "Unknown") : "Unassigned",
+          location: [level?.name, zone?.name].filter(Boolean).join(" · ") || "Not set",
+          due: t.due_date
+            ? new Date(t.due_date).toLocaleDateString([], { month: "short", day: "numeric" })
+            : "No due date",
+          priority: t.priority ? t.priority[0].toUpperCase() + t.priority.slice(1) : "Medium",
+          priorityLevel: taskPriorityLevel(t.priority),
+          status: taskStatusLabel(t.status),
+          statusLevel: taskStatusLevel(t.status),
+        } satisfies SiteTask;
+      });
+
+      /* Blueprint library, straight off `blueprints`. There's no per-sheet
+         component count, indexing percentage or file size in the schema, so
+         those mock fields are dropped rather than invented. */
+      const blueprintApprovalLabel = (status: string) =>
+        status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Pending";
+      const blueprintApprovalLevel = (status: string): Status =>
+        status === "approved" ? "success" : status === "rejected" ? "critical" : "warning";
+
+      const siteBlueprints: SiteBlueprint[] = (blueprints.data ?? []).map((b) => {
+        const level = levelById.get(b.level_id ?? "");
+        return {
+          id: b.id,
+          projectId: b.project_id,
+          name: b.name,
+          code: b.code,
+          project: projectById.get(b.project_id)?.name ?? "Unassigned",
+          level: level?.name ?? null,
+          discipline: b.discipline || "General",
+          revision: b.revision || "v1",
+          status: b.status,
+          approval: blueprintApprovalLabel(b.approval_status),
+          approvalLevel: blueprintApprovalLevel(b.approval_status),
+          uploader: b.uploaded_by ? (nameByUser.get(b.uploaded_by) ?? "Unknown") : "Unknown",
+          uploaded: new Date(b.created_at).toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          }),
+          approvedBy: b.approved_by ? (nameByUser.get(b.approved_by) ?? "Unknown") : null,
+          approvedAt: b.approved_at
+            ? new Date(b.approved_at).toLocaleDateString([], { month: "short", day: "numeric" })
+            : null,
+          aiRiskSummary: b.ai_risk_summary,
+        } satisfies SiteBlueprint;
+      });
+
+      const doneTasks = (tasks.data ?? []).filter((t) => t.status === "completed").length;
 
       /* Project rollups. Every figure is a count over rows, so a card showing
          "3 workers" means three presence rows point at that project. */
@@ -351,6 +517,7 @@ async function load(): Promise<void> {
           client: p.client ?? "",
           location: p.location ?? "",
           phase: p.phase ?? "",
+          budget: p.budget ?? "",
           status: p.status ?? "active",
           statusLevel:
             (hazardsPerProject.get(p.id) ?? 0) > 0
@@ -412,7 +579,12 @@ async function load(): Promise<void> {
         emittedAt: Date.now(),
         workers,
         projects: projectSummaries,
+        tasks: siteTasks,
+        blueprintsTotal: blueprints.data?.length ?? 0,
+        blueprintsPending: (blueprints.data ?? []).filter((b) => b.approval_status === "pending").length,
+        blueprints: siteBlueprints,
         issues,
+        reports,
         activity,
         zones: zoneList,
         aiHealth,
@@ -472,6 +644,8 @@ function open() {
     "zones",
     "projects",
     "profiles",
+    "reports",
+    "blueprints",
   ]) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, scheduleRefresh);
   }

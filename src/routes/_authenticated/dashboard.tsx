@@ -34,7 +34,6 @@ import {
 } from "@/components/primitives";
 import { WorkerDrawer } from "@/components/worker-drawer";
 import { useLiveData } from "@/lib/live-store";
-import { projects } from "@/lib/mock-data";
 import type { Worker } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -63,7 +62,8 @@ function Dashboard() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
-  const { activity, workers, aiHealth, zones, connected, tick } = useLiveData();
+  const { activity, workers, projects, blueprintsTotal, blueprintsPending, aiHealth, zones, connected, tick } =
+    useLiveData();
 
   const selected = workers.find((w) => w.id === selectedId) ?? null;
 
@@ -182,7 +182,7 @@ function Dashboard() {
             />
             <FolderCard
               title="Blueprints"
-              meta="18 drawings · 3 pending"
+              meta={`${blueprintsTotal} drawings · ${blueprintsPending} pending`}
               to="/blueprints"
               icon={FileStack}
             />

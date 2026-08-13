@@ -2,10 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { FileStack, UploadCloud, X, ZoomIn, ZoomOut } from "lucide-react";
 
-import { StatusChip,
-  PageHeader,
-} from "@/components/primitives";
-import { blueprints, type Blueprint } from "@/lib/mock-data";
+import { StatusChip, PageHeader } from "@/components/primitives";
+import { useLiveData, type SiteBlueprint } from "@/lib/live-store";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/blueprints")({
@@ -14,13 +12,12 @@ export const Route = createFileRoute("/_authenticated/blueprints")({
       { title: "Blueprint Library — Kaya AI" },
       {
         name: "description",
-        content:
-          "Versioned blueprint library with AI indexing status, approval state and sheet-level previews for every project.",
+        content: "Blueprint library with revision, discipline and approval state for every project.",
       },
       { property: "og:title", content: "Blueprint Library — Kaya AI" },
       {
         property: "og:description",
-        content: "Upload, index and approve construction drawing sets with AI-assisted review.",
+        content: "Every drawing set with revision, discipline and approval status, straight from the database.",
       },
     ],
   }),
@@ -50,25 +47,41 @@ function BlueprintSheet() {
 }
 
 function BlueprintsPage() {
-  const [preview, setPreview] = useState<Blueprint | null>(null);
+  const { blueprints, loading, error } = useLiveData();
+  const [preview, setPreview] = useState<SiteBlueprint | null>(null);
   const [zoom, setZoom] = useState(1);
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Blueprint Library" description="Drawings, revisions and AI verification status" />
+      <PageHeader
+        title="Blueprint Library"
+        description={
+          error
+            ? error
+            : loading
+              ? "Loading…"
+              : `${blueprints.length} drawing${blueprints.length === 1 ? "" : "s"} across every project`
+        }
+      />
       <div className="panel border-dashed p-10 text-center transition-colors hover:border-primary/50 hover:bg-primary/[0.02]">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary/8 ring-1 ring-primary/20">
           <UploadCloud className="h-5 w-5 text-primary" />
         </div>
         <p className="mt-4 text-sm font-semibold">Upload a drawing set</p>
         <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-          Drop PDF, DWG or RVT files here. Kaya indexes every sheet, extracts components and
-          makes the set searchable for on-site glasses comparison.
+          Drop PDF, DWG or RVT files here. Kaya indexes every sheet and makes the set searchable
+          for on-site glasses comparison.
         </p>
         <button className="mt-5 h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
           Select files
         </button>
       </div>
+
+      {!loading && blueprints.length === 0 && !error && (
+        <p className="text-sm text-muted-foreground">
+          No blueprints yet — drawing sets appear here once uploaded.
+        </p>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {blueprints.map((b) => (
@@ -88,10 +101,10 @@ function BlueprintsPage() {
               <p className="mt-1 truncate text-xs text-muted-foreground">{b.project}</p>
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border pt-4">
                 {[
-                  { label: "Version", value: b.version },
+                  { label: "Revision", value: b.revision },
+                  { label: "Discipline", value: b.discipline },
                   { label: "Uploaded", value: b.uploaded },
-                  { label: "AI indexed", value: b.indexed ? "Yes" : "In progress" },
-                  { label: "Sheets", value: `${b.sheets}` },
+                  { label: "Uploaded by", value: b.uploader },
                 ].map((row) => (
                   <div key={row.label} className="min-w-0">
                     <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -101,7 +114,6 @@ function BlueprintsPage() {
                   </div>
                 ))}
               </dl>
-              <p className="mt-4 truncate text-xs text-muted-foreground">{b.processing}</p>
             </div>
           </button>
         ))}
@@ -126,7 +138,7 @@ function BlueprintsPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{preview.name}</p>
                   <p className="num truncate text-xs text-muted-foreground">
-                    {preview.version} · {preview.sheets} sheets · {preview.size} · {preview.uploader}
+                    {preview.revision} · {preview.discipline} · {preview.uploader}
                   </p>
                 </div>
               </div>
@@ -162,6 +174,16 @@ function BlueprintsPage() {
                 <BlueprintSheet />
               </div>
             </div>
+            {preview.aiRiskSummary && (
+              <div className="border-t border-border p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  AI risk summary
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+                  {preview.aiRiskSummary}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

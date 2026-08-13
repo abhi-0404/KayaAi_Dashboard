@@ -2,10 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Check, History, Sparkles, X, ZoomIn, ZoomOut } from "lucide-react";
 
-import { ProgressBar, StatusChip,
-  PageHeader,
-} from "@/components/primitives";
-import { blueprints } from "@/lib/mock-data";
+import { StatusChip, PageHeader } from "@/components/primitives";
+import { useLiveData } from "@/lib/live-store";
+import { setBlueprintApproval } from "@/lib/site-admin";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/blueprint-approval")({
@@ -14,42 +13,54 @@ export const Route = createFileRoute("/_authenticated/blueprint-approval")({
       { title: "Blueprint Approval — Kaya AI" },
       {
         name: "description",
-        content:
-          "Admin review queue: inspect drawing sets alongside AI component detection, risk summary and approval history.",
+        content: "Admin review queue: approve or reject pending drawing sets with the AI risk summary.",
       },
       { property: "og:title", content: "Blueprint Approval — Kaya AI" },
       {
         property: "og:description",
-        content: "Approve, reject or request changes on drawing sets with AI-assisted risk analysis.",
+        content: "Approve or reject drawing sets awaiting sign-off.",
       },
     ],
   }),
   component: ApprovalPage,
 });
 
-const detected = [
-  { name: "Structural columns", count: 84, level: "success" as const },
-  { name: "Beams & girders", count: 132, level: "success" as const },
-  { name: "Shear walls", count: 18, level: "success" as const },
-  { name: "Embed plates", count: 46, level: "warning" as const },
-  { name: "Unlabeled penetrations", count: 7, level: "critical" as const },
-];
-
-const historyLog = [
-  { who: "Lena Fischer", action: "Uploaded v8", when: "Aug 8, 2026 · 14:02" },
-  { who: "Kaya AI", action: "Indexed 31 sheets, 286 components", when: "Aug 8, 2026 · 14:09" },
-  { who: "Dana Whitfield", action: "Requested changes on v7", when: "Aug 5, 2026 · 09:31" },
-  { who: "Tom Whitaker", action: "Uploaded v7", when: "Aug 4, 2026 · 17:48" },
-];
-
 function ApprovalPage() {
-  const pending = blueprints.filter((b) => b.approval !== "Approved");
-  const [activeId, setActiveId] = useState(pending[0]?.id ?? "");
+  const { blueprints, loading, error } = useLiveData();
+  const pending = blueprints.filter((b) => b.approval === "Pending");
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [decision, setDecision] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const bp = pending.find((b) => b.id === activeId) ?? pending[0];
+  const bp = pending.find((b) => b.id === activeId) ?? pending[0] ?? null;
+
+  // Writes straight through; Realtime brings the queue back once the row updates.
+  const decide = async (id: string, approval: "approved" | "rejected") => {
+    setBusy(true);
+    await setBlueprintApproval(id, approval);
+    setBusy(false);
+    setActiveId(null);
+  };
+
+  if (!loading && pending.length === 0) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Blueprint Approval" description="Review and sign off pending drawings" />
+        <p className="text-sm text-muted-foreground">
+          {error ?? "Nothing is waiting on approval right now."}
+        </p>
+      </div>
+    );
+  }
+
   if (!bp) return null;
+
+  const historyLog = [
+    { who: bp.uploader, action: `Uploaded ${bp.revision}`, when: bp.uploaded },
+    ...(bp.approvedBy
+      ? [{ who: bp.approvedBy, action: bp.approval, when: bp.approvedAt ?? bp.uploaded }]
+      : []),
+  ];
 
   return (
     <div className="space-y-6">
@@ -58,10 +69,7 @@ function ApprovalPage() {
         {pending.map((b) => (
           <button
             key={b.id}
-            onClick={() => {
-              setActiveId(b.id);
-              setDecision(null);
-            }}
+            onClick={() => setActiveId(b.id)}
             className={cn(
               "h-9 rounded-lg px-3.5 text-sm font-medium transition-colors",
               b.id === bp.id
@@ -69,7 +77,7 @@ function ApprovalPage() {
                 : "border border-border bg-card text-muted-foreground hover:bg-accent",
             )}
           >
-            {b.project} · {b.version}
+            {b.project} · {b.revision}
           </button>
         ))}
       </div>
@@ -81,7 +89,7 @@ function ApprovalPage() {
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{bp.name}</p>
               <p className="num truncate text-xs text-muted-foreground">
-                {bp.version} · {bp.sheets} sheets · uploaded {bp.uploaded}
+                {bp.revision} · {bp.discipline} · uploaded {bp.uploaded}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -119,8 +127,6 @@ function ApprovalPage() {
                 <rect x="245" y="30" width="125" height="80" fill="none" stroke="oklch(0.5 0.1 255)" strokeWidth="1.5" />
                 <rect x="245" y="125" width="125" height="45" fill="none" stroke="oklch(0.5 0.1 255)" strokeWidth="1.5" />
                 <rect x="30" y="190" width="340" height="55" fill="none" stroke="oklch(0.5 0.1 255)" strokeWidth="1.5" />
-                <rect x="150" y="80" width="40" height="40" fill="none" stroke="oklch(0.58 0.24 27)" strokeWidth="1.5" strokeDasharray="4 2" />
-                <rect x="290" y="140" width="34" height="20" fill="none" stroke="oklch(0.75 0.16 70)" strokeWidth="1.5" strokeDasharray="4 2" />
                 <line x1="30" y1="100" x2="230" y2="100" stroke="oklch(0.75 0.04 255)" strokeWidth="0.8" strokeDasharray="4 3" />
               </svg>
             </div>
@@ -130,95 +136,9 @@ function ApprovalPage() {
             <div className="flex items-center gap-2">
               <History className="h-4 w-4 text-muted-foreground" />
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Version history
+                History
               </p>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {["v8 · current", "v7", "v6", "v5"].map((v, i) => (
-                <span
-                  key={v}
-                  className={cn(
-                    "num rounded-md px-2.5 py-1 text-xs font-medium",
-                    i === 0
-                      ? "bg-primary/8 text-primary ring-1 ring-primary/20"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {v}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: AI analysis */}
-        <div className="space-y-6">
-          <div className="panel p-5">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold">AI analysis</p>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-foreground/80">
-              286 components extracted with 0.93 mean confidence. Sheet numbering is continuous and
-              matches the transmittal. Two areas need human review before release to field glasses.
-            </p>
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Indexing confidence</span>
-                <span className="num font-medium text-foreground">93%</span>
-              </div>
-              <ProgressBar className="mt-2" value={93} />
-            </div>
-          </div>
-
-          <div className="panel p-5">
-            <p className="text-sm font-semibold">Detected components</p>
-            <div className="mt-3 divide-y divide-border">
-              {detected.map((d) => (
-                <div key={d.name} className="flex items-center justify-between gap-3 py-2.5">
-                  <span className="truncate text-sm text-foreground/85">{d.name}</span>
-                  <StatusChip level={d.level}>{d.count}</StatusChip>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel p-5">
-            <p className="text-sm font-semibold">Risk summary</p>
-            <ul className="mt-3 space-y-3">
-              {[
-                {
-                  level: "critical" as const,
-                  text: "7 unlabeled floor penetrations in Bay 4 — fall-hazard exposure if released as-is.",
-                },
-                {
-                  level: "warning" as const,
-                  text: "Embed plate schedule references a detail sheet not present in this set.",
-                },
-                {
-                  level: "success" as const,
-                  text: "Egress routes and guardrail lines are fully dimensioned.",
-                },
-              ].map((r, i) => (
-                <li key={i} className="flex gap-3">
-                  <span
-                    className={cn(
-                      "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                      r.level === "critical"
-                        ? "bg-critical"
-                        : r.level === "warning"
-                          ? "bg-warning"
-                          : "bg-success",
-                    )}
-                  />
-                  <p className="text-sm leading-relaxed text-foreground/80">{r.text}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="panel p-5">
-            <p className="text-sm font-semibold">Approval history</p>
             <ol className="mt-3 space-y-3">
               {historyLog.map((h, i) => (
                 <li key={i} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3">
@@ -231,45 +151,62 @@ function ApprovalPage() {
               ))}
             </ol>
           </div>
+        </div>
+
+        {/* Right: AI analysis + decision */}
+        <div className="space-y-6">
+          <div className="panel p-5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">AI risk summary</p>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-foreground/80">
+              {bp.aiRiskSummary ?? "No AI analysis available for this drawing set yet."}
+            </p>
+          </div>
+
+          <div className="panel p-5">
+            <p className="text-sm font-semibold">Details</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+              {[
+                { label: "Code", value: bp.code || "—" },
+                { label: "Discipline", value: bp.discipline },
+                { label: "Level", value: bp.level ?? "Not set" },
+                { label: "Status", value: bp.status },
+              ].map((row) => (
+                <div key={row.label} className="min-w-0">
+                  <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {row.label}
+                  </dt>
+                  <dd className="mt-0.5 truncate text-sm font-medium">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
 
           <div className="panel p-5">
             <p className="text-xs text-muted-foreground">
-              Uploaded by <span className="font-medium text-foreground">{bp.uploader}</span> ·{" "}
-              {bp.size}
+              Uploaded by <span className="font-medium text-foreground">{bp.uploader}</span>
             </p>
-            {decision && (
-              <div className="mt-4">
-                <StatusChip
-                  level={
-                    decision === "Approved"
-                      ? "success"
-                      : decision === "Rejected"
-                        ? "critical"
-                        : "warning"
-                  }
-                >
-                  {decision}
-                </StatusChip>
-              </div>
-            )}
+            <div className="mt-4">
+              <StatusChip level={bp.approvalLevel}>{bp.approval}</StatusChip>
+            </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
-                onClick={() => setDecision("Approved")}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-success px-3.5 text-sm font-medium text-success-foreground transition-colors hover:bg-success/90"
+                type="button"
+                disabled={busy}
+                onClick={() => void decide(bp.id, "approved")}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-success px-3.5 text-sm font-medium text-success-foreground transition-colors hover:bg-success/90 disabled:opacity-60"
               >
                 <Check className="h-4 w-4" /> Approve
               </button>
               <button
-                onClick={() => setDecision("Rejected")}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-critical px-3.5 text-sm font-medium text-critical-foreground transition-colors hover:bg-critical/90"
+                type="button"
+                disabled={busy}
+                onClick={() => void decide(bp.id, "rejected")}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-critical px-3.5 text-sm font-medium text-critical-foreground transition-colors hover:bg-critical/90 disabled:opacity-60"
               >
                 <X className="h-4 w-4" /> Reject
-              </button>
-              <button
-                onClick={() => setDecision("Changes requested")}
-                className="h-9 rounded-lg border border-border px-3.5 text-sm font-medium transition-colors hover:bg-accent"
-              >
-                Request changes
               </button>
             </div>
           </div>
