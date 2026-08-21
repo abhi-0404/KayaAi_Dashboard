@@ -8,12 +8,12 @@ import { useLiveData } from "@/lib/live-store";
 export const Route = createFileRoute("/_authenticated/reports")({
   head: () => ({
     meta: [
-      { title: "AI Reports — Kaya AI" },
+      { title: "AI Reports - Kaya AI" },
       {
         name: "description",
         content: "Reports generated from field observations, straight from the database.",
       },
-      { property: "og:title", content: "AI Reports — Kaya AI" },
+      { property: "og:title", content: "AI Reports - Kaya AI" },
       {
         property: "og:description",
         content: "Reports generated from field observations, straight from the database.",
@@ -42,7 +42,7 @@ function ReportsPage() {
 
       {!loading && reports.length === 0 && !error && (
         <p className="text-sm text-muted-foreground">
-          No reports yet — reports appear here once a session generates one.
+          No reports yet - reports appear here once a session generates one.
         </p>
       )}
 

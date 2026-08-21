@@ -14,13 +14,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/users")({
   head: () => ({
     meta: [
-      { title: "User Management — Kaya AI" },
+      { title: "User Management - Kaya AI" },
       {
         name: "description",
         content:
           "Approve new signups, switch roles between Admin and Supervisor, and audit account access across Kaya AI.",
       },
-      { property: "og:title", content: "User Management — Kaya AI" },
+      { property: "og:title", content: "User Management - Kaya AI" },
       {
         property: "og:description",
         content: "Approve pending signups and manage Admin/Supervisor roles.",

@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/tasks")({
   head: () => ({
     meta: [
-      { title: "Tasks — Kaya AI" },
+      { title: "Tasks - Kaya AI" },
       {
         name: "description",
         content: "Field task register with assignees, due dates and status, straight from the database.",
       },
-      { property: "og:title", content: "Tasks — Kaya AI" },
+      { property: "og:title", content: "Tasks - Kaya AI" },
       {
         property: "og:description",
         content: "Every field task with assignee, priority, due date and status.",

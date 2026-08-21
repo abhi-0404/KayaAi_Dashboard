@@ -13,13 +13,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/issues")({
   head: () => ({
     meta: [
-      { title: "Issue Management — Kaya AI" },
+      { title: "Issue Management - Kaya AI" },
       {
         name: "description",
         content:
           "Kanban issue board for site hazards and defects with AI summaries, reporter, location and priority.",
       },
-      { property: "og:title", content: "Issue Management — Kaya AI" },
+      { property: "og:title", content: "Issue Management - Kaya AI" },
       {
         property: "og:description",
         content: "Triage site issues from open to resolved with AI-written summaries.",

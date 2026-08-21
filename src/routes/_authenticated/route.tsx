@@ -63,7 +63,7 @@ function AuthenticatedLayout() {
           {DEV_AUTH_BYPASS && (
             <div className="hazard-tape flex items-center justify-center px-4 py-3">
               {/* <p className="rounded-full bg-background/90 px-3 py-1 text-[11px] font-semibold tracking-wide">
-                DEV AUTH BYPASS ACTIVE — not signed in, nothing here is access-controlled
+                DEV AUTH BYPASS ACTIVE - not signed in, nothing here is access-controlled
               </p> */}
             </div>
           )}

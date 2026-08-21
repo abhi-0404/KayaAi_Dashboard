@@ -9,12 +9,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/blueprints")({
   head: () => ({
     meta: [
-      { title: "Blueprint Library — Kaya AI" },
+      { title: "Blueprint Library - Kaya AI" },
       {
         name: "description",
         content: "Blueprint library with revision, discipline and approval state for every project.",
       },
-      { property: "og:title", content: "Blueprint Library — Kaya AI" },
+      { property: "og:title", content: "Blueprint Library - Kaya AI" },
       {
         property: "og:description",
         content: "Every drawing set with revision, discipline and approval status, straight from the database.",
@@ -79,7 +79,7 @@ function BlueprintsPage() {
 
       {!loading && blueprints.length === 0 && !error && (
         <p className="text-sm text-muted-foreground">
-          No blueprints yet — drawing sets appear here once uploaded.
+          No blueprints yet - drawing sets appear here once uploaded.
         </p>
       )}
 

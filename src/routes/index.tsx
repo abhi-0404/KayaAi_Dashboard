@@ -22,13 +22,13 @@ import dashboardImage from "@/assets/kaya-ai-dashboard-image.png";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Kaya AI — Smart Glasses Construction Command Center" },
+      { title: "Kaya AI - Smart Glasses Construction Command Center" },
       {
         name: "description",
         content:
           "Kaya AI turns Meta Smart Glasses into a live construction command center: hazard detection, worker telemetry, blueprint approvals and AI site reports in real time.",
       },
-      { property: "og:title", content: "Kaya AI — Construction Command Center" },
+      { property: "og:title", content: "Kaya AI - Construction Command Center" },
       {
         property: "og:description",
         content:
@@ -65,7 +65,7 @@ const features = [
   {
     icon: Sparkles,
     title: "AI site reports",
-    body: "Daily narrative reports generated from sessions, issues and progress — no manual write-ups.",
+    body: "Daily narrative reports generated from sessions, issues and progress - no manual write-ups.",
   },
   {
     icon: ShieldCheck,
@@ -185,21 +185,21 @@ function LandingPage() {
 
         <div className="relative mx-auto grid max-w-[1400px] gap-10 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,420px)] lg:gap-14 lg:px-8 lg:pb-24 lg:pt-16">
           <div className="min-w-0">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            {/* <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               Meta smart glasses integrated
-            </span>
+            </span> */}
 
             <h1 className="mt-6 max-w-2xl text-[2.5rem] font-bold leading-[1.06] tracking-[-0.035em] lg:text-[3.75rem]">
               Run every jobsite from one live command center.
             </h1>
 
             {/* Hazard stripe as a rule — one deliberate site reference */}
-            <div className="hazard-tape mt-7 h-1.5 w-28 rounded-full" />
+            <div className="hazard-tape mt-7 h-1.5 w-150 rounded-full" />
 
             <p className="mt-6 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-              Kaya AI streams what your crew sees — hazards, blueprints, progress and worker
-              telemetry — into a single operational surface built for construction teams that move
+              Kaya AI streams what your crew sees - hazards, blueprints, progress and worker
+              telemetry - into a single operational surface built for construction teams that move
               fast and stay compliant.
             </p>
 
@@ -282,7 +282,7 @@ function LandingPage() {
             </h2>
             <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">
               Every session is transcribed, analysed and indexed against the right project, task and
-              blueprint — so supervisors act on signal, not screenshots.
+              blueprint - so supervisors act on signal, not screenshots.
             </p>
           </div>
 
@@ -356,7 +356,7 @@ function LandingPage() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-3 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <p>© {new Date().getFullYear()} Kaya AI · Construction Command Center</p>
+          <p>© {new Date().getFullYear()} Kaya AI - Construction Command Center</p>
           <p>Restricted system. All sessions are logged and auditable.</p>
         </div>
       </footer>

@@ -21,10 +21,10 @@ export const Route = createFileRoute("/_authenticated/projects/$projectId")({
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Project unavailable — Kaya AI" }, { name: "robots", content: "noindex" }],
+        meta: [{ title: "Project unavailable - Kaya AI" }, { name: "robots", content: "noindex" }],
       };
     }
-    const title = `${loaderData.project.name} — Kaya AI`;
+    const title = `${loaderData.project.name} - Kaya AI`;
     const description = `${loaderData.project.name}: ${loaderData.project.progress}% complete, ${loaderData.project.workers} workers, ${loaderData.project.blueprint}.`;
     return {
       meta: [

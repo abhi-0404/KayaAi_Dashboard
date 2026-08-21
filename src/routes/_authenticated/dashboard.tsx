@@ -39,13 +39,13 @@ import type { Worker } from "@/lib/mock-data";
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Kaya AI Construction Command Center" },
+      { title: "Dashboard - Kaya AI Construction Command Center" },
       {
         name: "description",
         content:
           "Real-time construction command center: worker safety, AI glasses sessions, hazards, blueprints and project progress in one operational view.",
       },
-      { property: "og:title", content: "Kaya AI — Construction Command Center" },
+      { property: "og:title", content: "Kaya AI - Construction Command Center" },
       {
         property: "og:description",
         content:
