@@ -23,6 +23,10 @@ export const DEV_AUTH_BYPASS =
   import.meta.env.DEV && import.meta.env["VITE_DEV_AUTH_BYPASS"] === "true";
 
 /** Stable synthetic id so rows keyed on the user do not churn between reloads. */
-export const DEV_USER_ID = "00000000-0000-4000-8000-0000000000de";
-export const DEV_USER_EMAIL = "dev.bypass@Kaya.local";
-export const DEV_USER_NAME = "Dev Bypass";
+export const DEV_USER_ID = "2ca56023-4885-4af2-9fde-74191a540a5c";
+export const DEV_USER_EMAIL = "abhishek@gmail.com";
+export const DEV_USER_NAME = "Abhishek Suman (Admin)";
+
+// Hardcoded dev credentials (dev/local only)
+export const DEV_ADMIN_EMAIL = "abhishek@gmail.com";
+export const DEV_ADMIN_PASSWORD = "12345678";

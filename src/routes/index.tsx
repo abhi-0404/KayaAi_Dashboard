@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { AuthPanel, type AuthMode } from "@/components/auth-panel";
 import { useAuth } from "@/components/auth-context";
 import { DEV_AUTH_BYPASS } from "@/lib/dev-auth";
-import heroImage from "@/assets/landing-page-kaya-ai.png.asset.json";
+import dashboardImage from "@/assets/kaya-ai-dashboard-image.png";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -290,10 +290,8 @@ function LandingPage() {
               mount is what makes the overlay legible. */}
           <div className="mt-10 overflow-hidden rounded-3xl bg-ink p-2 shadow-raised">
             <img
-              src={heroImage.url}
-              alt="Meta Smart Glasses AR overlay showing project overview, hazard detection and AI insights on a live construction site"
-              width={1600}
-              height={1104}
+              src={dashboardImage}
+              alt="Kaya AI Dashboard showing real-time construction site monitoring, worker telemetry, hazard detection and project management"
               className="h-auto w-full rounded-2xl object-cover"
             />
           </div>
