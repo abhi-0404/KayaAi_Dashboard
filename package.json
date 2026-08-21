@@ -9,7 +9,10 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "seed": "node scripts/seed-database.mjs",
+    "seed:workers": "node scripts/seed-test-workers.mjs",
+    "setup:streaming": "node scripts/add-streaming-columns.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -42,9 +45,10 @@
     "@supabase/supabase-js": "^2.112.2",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.101.1",
-    "@tanstack/react-router": "1.170.18",
-    "@tanstack/react-start": "1.168.32",
-    "@tanstack/router-plugin": "1.168.23",
+    "@tanstack/react-router": "^1.170.27",
+    "@tanstack/react-start": "^1.168.44",
+    "agora-rtc-sdk-ng": "^4.24.7",
+    "agora-token": "^2.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
