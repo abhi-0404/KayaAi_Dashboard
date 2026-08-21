@@ -16,7 +16,7 @@ import {
   DEV_USER_NAME,
 } from "@/lib/dev-auth";
 
-export type AppRole = "admin" | "supervisor";
+export type AppRole = "admin" | "supervisor" | "worker";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -133,6 +133,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setProfileLoading(true);
     void loadProfile(userId);
+
+    // Subscribe to real-time profile changes
+    const subscription = supabase
+      .channel(`profile_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${userId}`
+        },
+        (payload) => {
+          console.log('Profile updated:', payload);
+          // Reload profile when it changes in the database
+          void loadProfile(userId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [userId, loadProfile]);
 
   const refreshProfile = useCallback(async () => {

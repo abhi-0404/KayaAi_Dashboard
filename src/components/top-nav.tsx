@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Bell, ChevronDown, LogOut, MoreHorizontal, Search } from "lucide-react";
+import { Bell, ChevronDown, LogOut, MoreHorizontal, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/components/auth-context";
@@ -84,10 +84,12 @@ export function TopNav() {
   const [menu, setMenu] = useState(false);
   const [more, setMore] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [notifications, setNotifications] = useState(false);
 
   const menuRef = useDismiss(menu, () => setMenu(false));
   const moreRef = useDismiss(more, () => setMore(false));
   const mobileRef = useDismiss(mobile, () => setMobile(false));
+  const notificationsRef = useDismiss(notifications, () => setNotifications(false));
 
   const name = profile?.display_name ?? user?.email ?? "Signed in";
   const email = profile?.email ?? user?.email ?? "";
@@ -126,8 +128,8 @@ export function TopNav() {
    * escaped the header instead of collapsing.
    */
   return (
-    <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-[68px] max-w-[1400px] items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 bg-background/85 backdrop-blur-xl overflow-visible">
+      <div className="mx-auto flex h-[68px] max-w-[1400px] items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8 overflow-visible">
         {/* Brand */}
         <Link to="/dashboard" className="flex shrink-0 items-center gap-2.5">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-[15px] font-bold text-primary-foreground">
@@ -139,15 +141,18 @@ export function TopNav() {
         </Link>
 
         {/* Centred rail. fade-scroll keeps a long rail from looking clipped. */}
-        <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1 [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden">
+        <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto overflow-y-visible px-1 [scrollbar-width:none] md:flex [&::-webkit-scrollbar]:hidden">
           {primary.map((item) => (
             <NavPill key={item.to} {...item} active={isActive(item.to)} />
           ))}
 
-          <div className="relative" ref={moreRef}>
+          <div className="relative z-50" ref={moreRef}>
             <button
               type="button"
-              onClick={() => setMore((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMore((v) => !v);
+              }}
               aria-expanded={more}
               aria-haspopup="menu"
               className={cn(
@@ -156,6 +161,7 @@ export function TopNav() {
                   ? "bg-nav-active font-semibold text-foreground"
                   : "font-medium text-muted-foreground hover:bg-nav-active/70 hover:text-foreground",
               )}
+              id="more-button"
             >
               More
               {isAdmin && pendingApprovals > 0 && (
@@ -163,15 +169,19 @@ export function TopNav() {
               )}
               <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", more && "rotate-180")} />
             </button>
-            <div
-              role="menu"
-              className={cn(
-                "absolute left-1/2 top-12 w-56 origin-top -translate-x-1/2 rounded-2xl border border-border bg-popover p-1.5 shadow-raised transition-all duration-150",
-                more
-                  ? "pointer-events-auto scale-100 opacity-100"
-                  : "pointer-events-none scale-95 opacity-0",
-              )}
-            >
+            {more && (
+              <div
+                role="menu"
+                className="fixed w-56 rounded-2xl border border-border bg-popover p-1.5 shadow-2xl"
+                style={{ 
+                  zIndex: 9999,
+                  top: 'calc(68px + 0.5rem)', // header height + small gap
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  maxWidth: '90vw'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
               {extras.map((item) => (
                 <Link
                   key={item.to}
@@ -192,7 +202,8 @@ export function TopNav() {
                   )}
                 </Link>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         </nav>
 
@@ -221,24 +232,71 @@ export function TopNav() {
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           </div>
 
-          <Link
-            to={pendingApprovals > 0 ? "/users" : "/settings"}
-            aria-label={
-              pendingApprovals > 0
-                ? `Notifications: ${pendingApprovals} pending approvals`
-                : "Notifications"
-            }
-            className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <Bell className="h-4 w-4" />
-            {pendingApprovals > 0 ? (
-              <span className="num absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-critical px-1 text-[10px] font-semibold text-white ring-2 ring-background">
-                {pendingApprovals > 9 ? "9+" : pendingApprovals}
-              </span>
-            ) : (
-              <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-critical ring-2 ring-card" />
+          <div className="relative" ref={notificationsRef}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotifications((v) => !v);
+              }}
+              aria-label={
+                pendingApprovals > 0
+                  ? `Notifications: ${pendingApprovals} pending approvals`
+                  : "Notifications"
+              }
+              className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-card text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Bell className="h-4 w-4" />
+              {pendingApprovals > 0 ? (
+                <span className="num absolute -right-0.5 -top-0.5 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-critical px-1 text-[10px] font-semibold text-white ring-2 ring-background">
+                  {pendingApprovals > 9 ? "9+" : pendingApprovals}
+                </span>
+              ) : (
+                <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-critical ring-2 ring-card" />
+              )}
+            </button>
+
+            {notifications && (
+              <div
+                role="menu"
+                className="fixed w-80 rounded-2xl border border-border bg-popover shadow-2xl"
+                style={{ 
+                  zIndex: 9999,
+                  top: 'calc(68px + 0.5rem)',
+                  right: '1rem'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="border-b border-border px-4 py-3">
+                  <h3 className="text-sm font-semibold">Notifications</h3>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                  {pendingApprovals > 0 ? (
+                    <Link
+                      to="/users"
+                      onClick={() => setNotifications(false)}
+                      className="flex items-start gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-accent"
+                    >
+                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-warning/10">
+                        <ShieldCheck className="h-4 w-4 text-warning" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">User approvals pending</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {pendingApprovals} {pendingApprovals === 1 ? 'user' : 'users'} waiting for approval
+                        </p>
+                      </div>
+                    </Link>
+                  ) : (
+                    <div className="px-4 py-8 text-center">
+                      <Bell className="mx-auto h-8 w-8 text-muted-foreground opacity-50" />
+                      <p className="mt-2 text-sm text-muted-foreground">No new notifications</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-          </Link>
+          </div>
 
           {/* Mobile navigation. The pill rail is hidden below md, and the
               overflow menu lives inside it, so this needs its own panel

@@ -21,12 +21,32 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { profileLoading, approvalStatus } = useAuth();
+  const { profileLoading, approvalStatus, roles } = useAuth();
 
   if (profileLoading) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
         <p className="text-sm text-muted-foreground">Verifying access…</p>
+      </div>
+    );
+  }
+
+  // Workers cannot access the website - only mobile app
+  if (roles.includes("worker") && !roles.includes("supervisor") && !roles.includes("admin")) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <div className="panel max-w-md p-8 text-center">
+          <h1 className="text-lg font-semibold tracking-tight">Website Access Not Available</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Worker accounts can only access the mobile application. Please use the Kaya AI mobile app to access your account.
+          </p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="mt-6 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
     );
   }

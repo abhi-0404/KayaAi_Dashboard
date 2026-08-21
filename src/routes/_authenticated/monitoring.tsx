@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Battery,
   Mic,
@@ -20,7 +20,9 @@ import {
 } from "@/components/primitives";
 import { formatClock, useLiveData } from "@/lib/live-store";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import liveFeed from "@/assets/live-feed.jpg";
+import AgoraRTC, { type IAgoraRTCClient, type IAgoraRTCRemoteUser } from "agora-rtc-sdk-ng";
 
 export const Route = createFileRoute("/_authenticated/monitoring")({
   head: () => ({
@@ -60,6 +62,12 @@ function MonitoringPage() {
   const [activeId, setActiveId] = useState(live[0]?.id ?? "");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [q, setQ] = useState("");
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [streamLoading, setStreamLoading] = useState(false);
+  const [streamType, setStreamType] = useState<'agora' | 'hls' | 'mp4' | null>(null);
+  const [channelName, setChannelName] = useState<string | null>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const agoraClientRef = useRef<IAgoraRTCClient | null>(null);
 
   const filtered = live.filter((w) => {
     const matchQ = `${w.name} ${w.zone}`.toLowerCase().includes(q.toLowerCase());
@@ -72,6 +80,176 @@ function MonitoringPage() {
   });
 
   const worker = live.find((w) => w.id === activeId) ?? live[0];
+  
+  // Load stream info when worker changes
+  useEffect(() => {
+    if (!worker) return;
+    
+    async function loadStreamInfo() {
+      setStreamLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('devices')
+          .select('stream_url, streaming, stream_type, channel_name')
+          .eq('user_id', worker.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data?.streaming) {
+          const type = (data.stream_type || 'mp4') as 'agora' | 'hls' | 'mp4';
+          setStreamType(type);
+          
+          if (type === 'agora' && data.channel_name) {
+            setChannelName(data.channel_name);
+            setStreamUrl(null);
+          } else if (data.stream_url) {
+            setStreamUrl(data.stream_url);
+            setChannelName(null);
+          } else {
+            setStreamUrl(null);
+            setChannelName(null);
+          }
+        } else {
+          setStreamUrl(null);
+          setChannelName(null);
+          setStreamType(null);
+        }
+      } catch (error) {
+        console.error('Error loading stream:', error);
+        setStreamUrl(null);
+        setChannelName(null);
+        setStreamType(null);
+      } finally {
+        setStreamLoading(false);
+      }
+    }
+    
+    loadStreamInfo();
+    
+    // Realtime subscription for streaming status updates
+    const subscription = supabase
+      .channel(`device_${worker.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'devices',
+        filter: `user_id=eq.${worker.id}`
+      }, (payload) => {
+        const newData = payload.new as any;
+        if (newData.streaming) {
+          const type = (newData.stream_type || 'mp4') as 'agora' | 'hls' | 'mp4';
+          setStreamType(type);
+          
+          if (type === 'agora' && newData.channel_name) {
+            setChannelName(newData.channel_name);
+            setStreamUrl(null);
+          } else if (newData.stream_url) {
+            setStreamUrl(newData.stream_url);
+            setChannelName(null);
+          }
+        } else {
+          setStreamUrl(null);
+          setChannelName(null);
+          setStreamType(null);
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [worker?.id]);
+  
+  // Agora streaming setup
+  useEffect(() => {
+    if (streamType !== 'agora' || !channelName) {
+      // Cleanup existing Agora connection
+      if (agoraClientRef.current) {
+        agoraClientRef.current.leave();
+        agoraClientRef.current = null;
+      }
+      return;
+    }
+    
+    const appId = import.meta.env.VITE_AGORA_APP_ID;
+    if (!appId) {
+      console.error('❌ VITE_AGORA_APP_ID not configured');
+      return;
+    }
+    
+    async function joinAgoraChannel() {
+      try {
+        // Create Agora client
+        const client = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
+        agoraClientRef.current = client;
+        
+        // Set client role to audience (viewer)
+        await client.setClientRole("audience");
+        
+        // Get token from API (if using token authentication)
+        let token: string | null = null;
+        try {
+          const response = await fetch('/api/generate-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              channelName, 
+              userId: worker.id,
+              role: 'subscriber'
+            })
+          });
+          const data = await response.json();
+          token = data.token;
+        } catch (err) {
+          console.warn('⚠️ Token generation failed, trying without token:', err);
+        }
+        
+        // Join channel
+        await client.join(appId, channelName, token, null);
+        console.log('✅ Joined Agora channel:', channelName);
+        
+        // Listen for remote users
+        client.on("user-published", async (user: IAgoraRTCRemoteUser, mediaType: "video" | "audio") => {
+          await client.subscribe(user, mediaType);
+          console.log("✅ Subscribed to remote user:", user.uid);
+          
+          if (mediaType === "video" && videoContainerRef.current) {
+            // Clear container
+            videoContainerRef.current.innerHTML = '';
+            // Play remote video
+            user.videoTrack?.play(videoContainerRef.current);
+          }
+          
+          if (mediaType === "audio") {
+            user.audioTrack?.play();
+          }
+        });
+        
+        client.on("user-unpublished", (user: IAgoraRTCRemoteUser) => {
+          console.log("User unpublished:", user.uid);
+          if (videoContainerRef.current) {
+            videoContainerRef.current.innerHTML = '';
+          }
+        });
+        
+      } catch (error) {
+        console.error('❌ Failed to join Agora channel:', error);
+        agoraClientRef.current = null;
+      }
+    }
+    
+    joinAgoraChannel();
+    
+    // Cleanup
+    return () => {
+      if (agoraClientRef.current) {
+        agoraClientRef.current.leave();
+        agoraClientRef.current = null;
+      }
+    };
+  }, [streamType, channelName, worker?.id]);
+  
   if (!worker) return null;
 
   return (
@@ -159,22 +337,75 @@ function MonitoringPage() {
           </div>
 
           <div className="relative aspect-video w-full bg-ink">
-            <img
-              src={liveFeed}
-              alt={`Live smart glasses feed from ${worker.name} at ${worker.zone}`}
-              className="h-full w-full object-cover"
-            />
+            {streamType === 'agora' && channelName && !streamLoading ? (
+              // Agora real-time stream
+              <div
+                ref={videoContainerRef}
+                className="h-full w-full"
+              />
+            ) : streamUrl && !streamLoading && (streamType === 'hls' || streamType === 'mp4') ? (
+              // HLS or MP4 video stream
+              <video
+                key={streamUrl}
+                className="h-full w-full object-cover"
+                autoPlay
+                playsInline
+                muted={false}
+                controls
+                onError={(e) => {
+                  console.error('Video playback error:', e);
+                  setStreamUrl(null);
+                }}
+              >
+                <source src={streamUrl} type={streamType === 'hls' ? "application/x-mpegURL" : "video/mp4"} />
+                Your browser does not support video playback.
+              </video>
+            ) : streamLoading ? (
+              // Loading state
+              <div className="flex h-full w-full items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                  <p className="mt-4 text-sm text-muted-foreground">Loading stream...</p>
+                </div>
+              </div>
+            ) : (
+              // Fallback placeholder
+              <>
+                <img
+                  src={liveFeed}
+                  alt={`Live smart glasses feed from ${worker.name} at ${worker.zone}`}
+                  className="h-full w-full object-cover opacity-50"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-ink/50">
+                  <div className="text-center">
+                    <Video className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <p className="mt-4 text-sm text-muted-foreground">No live stream available</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Worker device not streaming</p>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="scan-lines pointer-events-none absolute inset-0" />
             <div className="absolute left-4 top-4 flex items-center gap-2 rounded-md bg-ink/80 px-2.5 py-1.5 backdrop-blur">
-              <StatusDot level="critical" pulse />
+              <StatusDot level={(streamUrl || channelName) ? "critical" : "idle"} pulse={!!(streamUrl || channelName)} />
               <span className="num text-[11px] font-semibold uppercase tracking-wider text-ink-foreground">
-                Live · {worker.glasses}
+                {(streamUrl || channelName) ? 'Live' : 'Offline'} · {worker.glasses}
               </span>
             </div>
             <div className="absolute right-4 top-4 flex gap-2">
               <button
                 aria-label="Fullscreen"
                 className="grid h-8 w-8 place-items-center rounded-md bg-ink/80 text-ink-foreground backdrop-blur transition-colors hover:bg-ink"
+                onClick={() => {
+                  const videoEl = document.querySelector('video');
+                  if (videoEl) {
+                    if (document.fullscreenElement) {
+                      document.exitFullscreen();
+                    } else {
+                      videoEl.requestFullscreen();
+                    }
+                  }
+                }}
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </button>
@@ -194,17 +425,21 @@ function MonitoringPage() {
                     : "No observation reported yet."}
               </p>
             </div>
-            {/* AI bounding box overlay */}
-            <div className="pointer-events-none absolute left-[18%] top-[24%] h-[34%] w-[26%] rounded-sm border border-primary/80">
-              <span className="num absolute -top-5 left-0 rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-                worker · 0.97
-              </span>
-            </div>
-            <div className="pointer-events-none absolute right-[20%] top-[40%] h-[26%] w-[20%] rounded-sm border border-warning/80">
-              <span className="num absolute -top-5 left-0 rounded-sm bg-warning px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
-                beam gap · {confidence == null ? "—" : confidence.toFixed(2)}
-              </span>
-            </div>
+            {/* AI bounding box overlay - only show when stream is active */}
+            {(streamUrl || channelName) && (
+              <>
+                <div className="pointer-events-none absolute left-[18%] top-[24%] h-[34%] w-[26%] rounded-sm border border-primary/80">
+                  <span className="num absolute -top-5 left-0 rounded-sm bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+                    worker · 0.97
+                  </span>
+                </div>
+                <div className="pointer-events-none absolute right-[20%] top-[40%] h-[26%] w-[20%] rounded-sm border border-warning/80">
+                  <span className="num absolute -top-5 left-0 rounded-sm bg-warning px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
+                    beam gap · {confidence == null ? "—" : confidence.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

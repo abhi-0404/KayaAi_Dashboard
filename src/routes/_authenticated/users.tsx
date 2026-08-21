@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, RefreshCw, Search, ShieldCheck, UserCog, X } from "lucide-react";
+import { Check, RefreshCw, Search, ShieldCheck, UserCog, X, MoreVertical, UserX, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth, type AppRole, type ApprovalStatus } from "@/components/auth-context";
@@ -42,7 +42,7 @@ type Row = {
   role: AppRole;
 };
 
-const FILTERS = ["Pending", "All", "Approved", "Rejected"] as const;
+const FILTERS = ["Pending", "All", "Approved", "Blocked"] as const;
 
 function initialsOf(name: string | null, email: string | null) {
   const base = (name ?? email ?? "?").trim();
@@ -58,8 +58,9 @@ function UsersPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("Pending");
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
   const [q, setQ] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +89,15 @@ function UsersPage() {
     void load();
   }, [load]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setOpenMenuId(null);
+    if (openMenuId) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [openMenuId]);
+
   const setStatus = async (row: Row, status: ApprovalStatus) => {
     setBusyId(row.id);
     const { error } = await supabase
@@ -103,11 +113,30 @@ function UsersPage() {
       toast.error(error.message);
       return;
     }
-    toast.success(
-      status === "approved"
-        ? `${row.display_name ?? row.email} approved`
-        : `${row.display_name ?? row.email} access revoked`,
-    );
+    
+    // Better toast messages based on context and role
+    if (status === "approved") {
+      if (row.role === "worker") {
+        toast.success(`${row.display_name ?? row.email} worker account has been approved (mobile app access granted)`);
+      } else {
+        toast.success(
+          row.approval_status === "rejected"
+            ? `${row.display_name ?? row.email} has been unblocked and approved (website access granted)`
+            : `${row.display_name ?? row.email} has been approved (website access granted)`
+        );
+      }
+    } else if (status === "rejected") {
+      if (row.role === "worker") {
+        toast.success(`${row.display_name ?? row.email} worker has been blocked (mobile app access revoked)`);
+      } else {
+        toast.success(
+          row.approval_status === "approved"
+            ? `${row.display_name ?? row.email} has been blocked (website access revoked)`
+            : `${row.display_name ?? row.email} request has been declined`
+        );
+      }
+    }
+    
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, approval_status: status } : r)));
     if (row.id === user?.id) await refreshProfile();
     await refreshPendingCount();
@@ -140,7 +169,7 @@ function UsersPage() {
           filter === "All" ||
           (filter === "Pending" && r.approval_status === "pending") ||
           (filter === "Approved" && r.approval_status === "approved") ||
-          (filter === "Rejected" && r.approval_status === "rejected");
+          (filter === "Blocked" && r.approval_status === "rejected");
         const term = q.toLowerCase();
         return (
           byFilter &&
@@ -235,35 +264,64 @@ function UsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <label className="inline-flex items-center gap-2">
-                      <UserCog className="h-4 w-4 text-muted-foreground" />
-                      <select
-                        value={u.role}
-                        disabled={busyId === u.id}
-                        onChange={(e) => void setRole(u, e.target.value as AppRole)}
-                        className="h-8 rounded-lg border border-border bg-card px-2 text-sm font-medium outline-none focus:border-primary/60 disabled:opacity-60"
-                      >
-                        <option value="admin">Admin</option>
-                        <option value="supervisor">Supervisor</option>
-                      </select>
-                    </label>
+                    {u.role === "worker" ? (
+                      // Workers: Show role as read-only badge (no dropdown)
+                      <div className="inline-flex items-center gap-2">
+                        <UserCog className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">Worker</span>
+                      </div>
+                    ) : (
+                      // Supervisors/Admins: Show dropdown to switch between Admin/Supervisor
+                      <label className="inline-flex items-center gap-2">
+                        <UserCog className="h-4 w-4 text-muted-foreground" />
+                        <select
+                          value={u.role}
+                          disabled={busyId === u.id}
+                          onChange={(e) => void setRole(u, e.target.value as AppRole)}
+                          className="h-8 rounded-lg border border-border bg-card px-2 text-sm font-medium outline-none focus:border-primary/60 disabled:opacity-60"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="supervisor">Supervisor</option>
+                        </select>
+                      </label>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <StatusChip
-                      level={
-                        u.approval_status === "approved"
-                          ? "success"
+                    {u.role === "worker" ? (
+                      // Workers: Show approval status (needed for mobile app access)
+                      <StatusChip
+                        level={
+                          u.approval_status === "approved"
+                            ? "success"
+                            : u.approval_status === "pending"
+                              ? "warning"
+                              : "critical"
+                        }
+                      >
+                        {u.approval_status === "approved"
+                          ? "Approved"
                           : u.approval_status === "pending"
-                            ? "warning"
-                            : "critical"
-                      }
-                    >
-                      {u.approval_status === "approved"
-                        ? "Approved"
-                        : u.approval_status === "pending"
-                          ? "Pending approval"
-                          : "Rejected"}
-                    </StatusChip>
+                            ? "Pending approval"
+                            : "Blocked"}
+                      </StatusChip>
+                    ) : (
+                      // Supervisors/Admins: Show approval status for website
+                      <StatusChip
+                        level={
+                          u.approval_status === "approved"
+                            ? "success"
+                            : u.approval_status === "pending"
+                              ? "warning"
+                              : "critical"
+                        }
+                      >
+                        {u.approval_status === "approved"
+                          ? "Approved"
+                          : u.approval_status === "pending"
+                            ? "Pending approval"
+                            : "Blocked"}
+                      </StatusChip>
+                    )}
                   </td>
                   <td className="num px-4 py-3 text-sm text-muted-foreground">
                     {new Date(u.created_at).toLocaleDateString(undefined, {
@@ -273,26 +331,120 @@ function UsersPage() {
                     })}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {u.approval_status !== "approved" && (
+                    <div className="flex items-center justify-end gap-2">
+                      <div className="relative">
                         <button
-                          onClick={() => void setStatus(u, "approved")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === u.id ? null : u.id);
+                          }}
                           disabled={busyId === u.id}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:bg-accent disabled:opacity-60"
+                          aria-label="User actions"
                         >
-                          <Check className="h-3.5 w-3.5" /> Approve
+                          <MoreVertical className="h-4 w-4" />
                         </button>
-                      )}
-                      {u.approval_status !== "rejected" && u.id !== user?.id && (
-                        <button
-                          onClick={() => void setStatus(u, "rejected")}
-                          disabled={busyId === u.id}
-                          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
-                        >
-                          <X className="h-3.5 w-3.5" />{" "}
-                          {u.approval_status === "pending" ? "Decline" : "Revoke"}
-                        </button>
-                      )}
+                        {openMenuId === u.id && (
+                          <div 
+                            className="absolute right-0 top-10 z-10 w-48 rounded-xl border border-border bg-popover p-1.5 shadow-lg"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* Workers: Show approve/block options for mobile app access */}
+                            {u.role === "worker" ? (
+                              <>
+                                {u.approval_status !== "approved" && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "approved");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+                                  >
+                                    <UserCheck className="h-4 w-4" /> Approve Worker (Mobile App)
+                                  </button>
+                                )}
+                                {u.approval_status === "approved" && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "rejected");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/10 disabled:opacity-60"
+                                  >
+                                    <UserX className="h-4 w-4" /> Block Worker (Mobile App)
+                                  </button>
+                                )}
+                                {u.approval_status === "pending" && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "rejected");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/10 disabled:opacity-60"
+                                  >
+                                    <X className="h-4 w-4" /> Decline Worker
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              /* Supervisors/Admins: Show approval/block options for website access */
+                              <>
+                                {u.approval_status !== "approved" && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "approved");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+                                  >
+                                    <UserCheck className="h-4 w-4" /> Approve User
+                                  </button>
+                                )}
+                                {u.approval_status === "approved" && u.id !== user?.id && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "rejected");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/10 disabled:opacity-60"
+                                  >
+                                    <UserX className="h-4 w-4" /> Block User
+                                  </button>
+                                )}
+                                {u.approval_status === "pending" && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "rejected");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-critical transition-colors hover:bg-critical/10 disabled:opacity-60"
+                                  >
+                                    <X className="h-4 w-4" /> Decline Request
+                                  </button>
+                                )}
+                                {u.approval_status === "rejected" && (
+                                  <button
+                                    onClick={() => {
+                                      void setStatus(u, "approved");
+                                      setOpenMenuId(null);
+                                    }}
+                                    disabled={busyId === u.id}
+                                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+                                  >
+                                    <UserCheck className="h-4 w-4" /> Unblock & Approve
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
