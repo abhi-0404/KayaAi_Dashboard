@@ -191,7 +191,7 @@ function LandingPage() {
             </span> */}
 
             <h1 className="mt-6 max-w-2xl text-[2.5rem] font-bold leading-[1.06] tracking-[-0.035em] lg:text-[3.75rem]">
-              Run every jobsite from one live command center.
+              Run every Constructionsite from one live command center.
             </h1>
 
             {/* Hazard stripe as a rule — one deliberate site reference */}
