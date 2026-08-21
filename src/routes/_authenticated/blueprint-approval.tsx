@@ -10,12 +10,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/blueprint-approval")({
   head: () => ({
     meta: [
-      { title: "Blueprint Approval — Kaya AI" },
+      { title: "Blueprint Approval - Kaya AI" },
       {
         name: "description",
         content: "Admin review queue: approve or reject pending drawing sets with the AI risk summary.",
       },
-      { property: "og:title", content: "Blueprint Approval — Kaya AI" },
+      { property: "og:title", content: "Blueprint Approval - Kaya AI" },
       {
         property: "og:description",
         content: "Approve or reject drawing sets awaiting sign-off.",
@@ -169,7 +169,7 @@ function ApprovalPage() {
             <p className="text-sm font-semibold">Details</p>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
               {[
-                { label: "Code", value: bp.code || "—" },
+                { label: "Code", value: bp.code || "-" },
                 { label: "Discipline", value: bp.discipline },
                 { label: "Level", value: bp.level ?? "Not set" },
                 { label: "Status", value: bp.status },

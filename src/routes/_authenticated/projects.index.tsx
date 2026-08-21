@@ -12,13 +12,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/projects/")({
   head: () => ({
     meta: [
-      { title: "Projects — Kaya AI" },
+      { title: "Projects - Kaya AI" },
       {
         name: "description",
         content:
           "All active construction projects with progress, crew size, blueprint state and AI monitoring status.",
       },
-      { property: "og:title", content: "Projects — Kaya AI" },
+      { property: "og:title", content: "Projects - Kaya AI" },
       {
         property: "og:description",
         content: "Track progress, crews, blueprints and AI coverage across every jobsite.",

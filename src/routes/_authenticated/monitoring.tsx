@@ -27,13 +27,13 @@ import AgoraRTC, { type IAgoraRTCClient, type IAgoraRTCRemoteUser } from "agora-
 export const Route = createFileRoute("/_authenticated/monitoring")({
   head: () => ({
     meta: [
-      { title: "Live Monitoring — Kaya AI" },
+      { title: "Live Monitoring - Kaya AI" },
       {
         name: "description",
         content:
           "Live Meta Smart Glasses feeds with AI observations, hazard alerts, voice transcript and device telemetry per worker.",
       },
-      { property: "og:title", content: "Live Monitoring — Kaya AI" },
+      { property: "og:title", content: "Live Monitoring - Kaya AI" },
       {
         property: "og:description",
         content: "Watch what the AI sees: live glasses feed, hazard alerts and voice transcript.",
@@ -325,7 +325,7 @@ function MonitoringPage() {
             </div>
             <div className="hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
               <span className="flex items-center gap-1.5">
-                <Signal className="h-3.5 w-3.5" /> <span className="num">{latencyMs == null ? "—" : latencyMs + " ms"}</span>
+                <Signal className="h-3.5 w-3.5" /> <span className="num">{latencyMs == null ? "-" : latencyMs + " ms"}</span>
               </span>
               <span className="num flex items-center gap-1.5">
                 <Battery className="h-3.5 w-3.5" /> {worker.battery}%
@@ -420,7 +420,7 @@ function MonitoringPage() {
               <p className="mt-1 text-sm text-ink-foreground">
                 {worker.hazardLevel !== "success" && worker.hazard !== "No hazard"
                   ? worker.hazard
-                  : worker.task && worker.task !== "—"
+                  : worker.task && worker.task !== "-"
                     ? `Tracking ${worker.task.toLowerCase()}.`
                     : "No observation reported yet."}
               </p>
@@ -435,7 +435,7 @@ function MonitoringPage() {
                 </div>
                 <div className="pointer-events-none absolute right-[20%] top-[40%] h-[26%] w-[20%] rounded-sm border border-warning/80">
                   <span className="num absolute -top-5 left-0 rounded-sm bg-warning px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
-                    beam gap · {confidence == null ? "—" : confidence.toFixed(2)}
+                    beam gap · {confidence == null ? "-" : confidence.toFixed(2)}
                   </span>
                 </div>
               </>
@@ -541,7 +541,7 @@ function MonitoringPage() {
                 {[
                   { label: "Observations", value: String(observations) },
                   { label: "Alerts", value: String(alerts) },
-                  { label: "Confidence", value: confidence == null ? "—" : confidence.toFixed(2) },
+                  { label: "Confidence", value: confidence == null ? "-" : confidence.toFixed(2) },
                 ].map((s) => (
                   <div key={s.label}>
                     <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">

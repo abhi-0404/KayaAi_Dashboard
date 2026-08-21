@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — Kaya AI" },
+      { title: "Settings - Kaya AI" },
       {
         name: "description",
         content:
           "Configure organization details, AI detection thresholds, smart glasses fleet policies and alert routing.",
       },
-      { property: "og:title", content: "Settings — Kaya AI" },
+      { property: "og:title", content: "Settings - Kaya AI" },
       {
         property: "og:description",
         content: "Organization, AI detection and smart glasses fleet configuration.",

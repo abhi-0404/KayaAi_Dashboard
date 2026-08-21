@@ -7,12 +7,12 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Reset password — Kaya AI" },
+      { title: "Reset password - Kaya AI" },
       {
         name: "description",
         content: "Set a new password for your Kaya AI construction command center account.",
       },
-      { property: "og:title", content: "Reset password — Kaya AI" },
+      { property: "og:title", content: "Reset password - Kaya AI" },
       {
         property: "og:description",
         content: "Choose a new password to regain access to your Kaya AI account.",
